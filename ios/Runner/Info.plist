@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>QriteeQ</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>QriteeQ</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string></string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.335452395933-0076v6178sbvboctirpiqhe1h9gp9suo</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>Bundle ID</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.qriteeq.qriteeqapp</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>FirebaseDynamicLinksCustomDomains</key>
+	<array>
+		<string>https://firebase.qriteeq.com</string>
+	</array>
+	<key>FlutterDeepLinkingEnabled</key>
+	<true/>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Play using while you are hiking</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Customer may want to take a picture using his camera and may want to post the photo on the social media platform.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>We need user contact details as it’s a community of users and users may want to interact with their contacts on this platform. They may also want to invite other users to the app for which they will have to access their contacts</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We need access to the location as a user may want to see people who are nearby and may want to post about them.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>We need access to the location as a user may want to see people who are nearby and may want to post about them.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need access to the location as a user may want to see people who are nearby and may want to post about them.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Allow the app to record using your phone's microphone</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We are a social media platform. We need access to photos as customers may want to post these photos from his image gallery on to the social media platform.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+</dict>
+</plist>

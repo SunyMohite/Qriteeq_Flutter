@@ -1,0 +1,12 @@
+.idea/libraries/Dart_Packages.xml
+.idea/libraries/Dart_SDK.xml
+.idea/libraries/Flutter_Plugins.xml
+.flutter-plugins-dependencies
+.flutter-plugins
+.dart_tool/version
+.dart_tool/flutter_build
+.idea/workspace.xml
+build/*
+!build/build.xml
+# Project exclude paths
+/.dart_tool/

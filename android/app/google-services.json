@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "335452395933",
+    "project_id": "qriteeq-ec8fe",
+    "storage_bucket": "qriteeq-ec8fe.appspot.com"
+  },
+  "client": [
+
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:335452395933:android:6fc4bc815d965786153774",
+        "android_client_info": {
+          "package_name": "com.qriteeq.qriteeqapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "335452395933-got1k7vrbk65egi75l7df27hlg6efefe.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.qriteeq.qriteeqapp",
+            "certificate_hash": "886345ad185c02c81b953607f48383f53ff49ce6"
+          }
+        },
+        {
+          "client_id": "335452395933-mo1qecejh5nflkaetoigimgn3dngne2s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbrBxrs6-EGiOozFtUcQrRBzAO6h9bhFg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "335452395933-mo1qecejh5nflkaetoigimgn3dngne2s.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "335452395933-0076v6178sbvboctirpiqhe1h9gp9suo.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.qriteeq.qriteeqapp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

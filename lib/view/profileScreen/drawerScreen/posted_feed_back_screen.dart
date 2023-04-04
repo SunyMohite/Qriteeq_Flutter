@@ -1,0 +1,1453 @@
+import 'dart:developer';
+import 'dart:ui';
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
+import 'package:get/get.dart';
+import 'package:humanscoring/common/circular_progress_indicator.dart';
+import 'package:humanscoring/modal/apiModel/res_model/posted_feedback_res_model.dart';
+import 'package:humanscoring/utils/assets/icons_utils.dart';
+import 'package:humanscoring/utils/assets/images_utils.dart';
+import 'package:humanscoring/utils/color_utils.dart';
+import 'package:humanscoring/utils/size_config_utils.dart';
+import 'package:humanscoring/viewmodel/post_feedback_view_model.dart';
+import 'package:octo_image/octo_image.dart';
+import 'package:readmore/readmore.dart';
+import 'package:sizer/sizer.dart';
+
+import '../../../common/commonWidget/common_profile_icon.dart';
+import '../../../common/commonWidget/custom_header.dart';
+import '../../../common/commonWidget/feedback_score_emoji.dart';
+import '../../../common/commonWidget/snackbar.dart';
+import '../../../common/deeplink_send_widget.dart';
+import '../../../modal/apiModel/res_model/like_unlike_res_model.dart';
+import '../../../modal/apis/api_response.dart';
+import '../../../service/download_file.dart';
+import '../../../service/video_player.dart';
+import '../../../utils/shared_preference_utils.dart';
+import '../../../utils/variable_utils.dart';
+import '../../../viewmodel/feedback_viewmodel.dart';
+import '../../detailsScreen/feed_back_details_screen.dart';
+import '../../generalScreen/no_searchfound_screen.dart';
+import '../../home/feed_inside_page/user_profile_inside_page.dart';
+
+class PostedFeedBacksScreen extends StatefulWidget {
+  final bool? isHeaderShow;
+
+  const PostedFeedBacksScreen({Key? key, required this.isHeaderShow})
+      : super(key: key);
+
+  @override
+  State<PostedFeedBacksScreen> createState() => _PostedFeedBacksScreenState();
+}
+
+class _PostedFeedBacksScreenState extends State<PostedFeedBacksScreen> {
+  PostFeedBackViewModel viewModel = Get.find<PostFeedBackViewModel>();
+  late ScrollController feedBackPostedController;
+
+  void _firstLoad() async {
+    viewModel.getFeedBackPosted(initLoad: true);
+  }
+
+  void _loadMore() async {
+    if (viewModel.isFeedBackPostedFirstLoading == false &&
+        viewModel.isFeedBackPostedMoreLoading == false &&
+        feedBackPostedController.position.extentAfter < 300) {
+      try {
+        viewModel.getFeedBackPosted();
+      } catch (err) {
+        log('Something went wrong!');
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    clearLocalList();
+    viewModel.getFeedBackPostedList.clear();
+    viewModel.feedBackPostedPage = 1;
+    viewModel.isFeedBackPostedFirstLoading = true;
+    if (viewModel.isFeedBackPostedFirstLoading == true) {
+      _firstLoad();
+    }
+
+    feedBackPostedController = ScrollController()..addListener(_loadMore);
+
+    super.initState();
+  }
+
+  FeedBackViewModel feedBackViewModel = Get.find();
+
+  @override
+  void dispose() {
+    feedBackPostedController.removeListener(_loadMore);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Material(
+        color: ColorUtils.offWhiteE5,
+        child: Column(
+          children: [
+            widget.isHeaderShow == true
+                ? const CustomHeaderWidget(
+                    headerTitle: VariableUtils.postedFeedback,
+                  )
+                : const SizedBox(),
+            Expanded(
+              child: GetBuilder<PostFeedBackViewModel>(
+                builder: (controller) {
+                  if (controller.isFeedBackPostedFirstLoading) {
+                    return const Center(
+                      child: CircularIndicator(),
+                    );
+                  } else if (controller.postFeedBackApiResponse.status ==
+                      Status.ERROR) {
+                    return const Center(
+                      child: Text("Server error"),
+                    );
+                  }
+
+                  if (controller.getFeedBackPostedList.isEmpty) {
+                    return const NoFeedBackFound(
+                      titleMsg: 'You are not Posted any feedback yet!',
+                      subTitleMsg: '',
+                    );
+                  }
+                  return RefreshIndicator(
+                    onRefresh: () {
+                      controller.getFeedBackPostedList.clear();
+                      controller.feedBackPostedPage = 1;
+                      controller.isFeedBackPostedFirstLoading = true;
+                      controller.getFeedBackPosted();
+                      clearLocalList();
+
+                      return Future.value();
+                    },
+                    child: SingleChildScrollView(
+                      controller: feedBackPostedController,
+                      child: Column(
+                        children: [
+                          Column(
+                            children: List.generate(
+                                controller.getFeedBackPostedList.length,
+                                (index) {
+                              MyFeedBackResults data =
+                                  controller.getFeedBackPostedList[index];
+                              var name = data.anonymous == true
+                                  ? VariableUtils.anonymous
+                                  : VariableUtils.you;
+                              var userName = data.user == null
+                                  ? ''
+                                  : data.user!.userIdentity;
+                              var country = data.senderUser!.countryName ??
+                                  VariableUtils.global;
+                              var time = data.createdAt;
+                              var review = data.text;
+                              var score = data.score;
+                              var userFlagUrl = data.user!.flagUrl ?? '';
+                              var userProfileType =
+                                  data.user!.profileType ?? '';
+                              var senderFlagUrl =
+                                  data.senderUser!.flagUrl ?? '';
+                              var senderProfileType =
+                                  data.senderUser!.profileType ?? '';
+                              return controller
+                                          .getFeedBackPostedList[index].user ==
+                                      null
+                                  ? const SizedBox()
+                                  : InkWell(
+                                      onTap: () async {
+                                        await Get.to(
+                                          FeedBackDetailsScreen(
+                                            feedBackId: controller
+                                                .getFeedBackPostedList[index]
+                                                .sId,
+                                          ),
+                                        );
+                                        controller.getFeedBackPostedList
+                                            .clear();
+                                        controller.feedBackPostedPage = 1;
+                                        controller
+                                                .isFeedBackPostedFirstLoading =
+                                            true;
+                                        await controller.getFeedBackPosted();
+                                        clearLocalList();
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(
+                                            bottom: 6.0, top: 4),
+                                        child: Material(
+                                          elevation: 0,
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 15.0, vertical: 15),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.center,
+                                                  children: [
+                                                    senderFlagUrl == ''
+                                                        ? Image.asset(
+                                                            "${baseImgPath}world.webp",
+                                                            scale: 9.w,
+                                                          )
+                                                        : SvgPicture.network(
+                                                            senderFlagUrl,
+                                                            height: 5.w,
+                                                            width: 5.w,
+                                                            fit: BoxFit.fill,
+                                                          ),
+
+                                                    SizedBox(width: 2.w),
+
+                                                    InkWell(
+                                                      onTap: () async {
+                                                        if (data.anonymous!) {
+                                                          return;
+                                                        }
+                                                        await Navigator.of(context).push(
+                                                            MaterialPageRoute(
+                                                                builder:
+                                                                    (context) =>
+                                                                        UserInsidePage(
+                                                                          screenName:
+                                                                              'PostedFeedBacksScreen',
+                                                                          userName:
+                                                                              name,
+                                                                          avatar:
+                                                                              PreferenceManagerUtils.getUserAvatar(),
+                                                                          toId:
+                                                                              PreferenceManagerUtils.getLoginId(),
+                                                                          phone:
+                                                                              PreferenceManagerUtils.getContactNumber(),
+                                                                          favorite:
+                                                                              false,
+                                                                          isBlock:
+                                                                              false,
+                                                                          flag:
+                                                                              false,
+                                                                          online:
+                                                                              false,
+                                                                          active:
+                                                                              true,
+                                                                        )));
+                                                      },
+                                                      child: Text(
+                                                        name,
+                                                        style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          fontSize: 10.sp,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    profileIconSetWidget(
+                                                        profileType:
+                                                            senderProfileType),
+                                                    controller
+                                                                .getFeedBackPostedList[
+                                                                    index]
+                                                                .user!
+                                                                .id ==
+                                                            PreferenceManagerUtils
+                                                                .getLoginId()
+                                                        ? const SizedBox()
+                                                        : Row(
+                                                            mainAxisSize:
+                                                                MainAxisSize
+                                                                    .min,
+                                                            children: [
+                                                              SizeConfig.sW1,
+
+                                                              IconsWidgets
+                                                                  .arrowIcon,
+                                                              SizeConfig.sW1,
+
+                                                              /// ==========SENDER=============
+                                                              userFlagUrl == ''
+                                                                  ? Image.asset(
+                                                                      "${baseImgPath}world.webp",
+                                                                      scale:
+                                                                          9.w,
+                                                                    )
+                                                                  : SvgPicture
+                                                                      .network(
+                                                                      userFlagUrl,
+                                                                      height:
+                                                                          5.w,
+                                                                      width:
+                                                                          5.w,
+                                                                      fit: BoxFit
+                                                                          .fill,
+                                                                    ),
+                                                              SizeConfig.sW1,
+
+                                                              InkWell(
+                                                                onTap:
+                                                                    () async {
+                                                                  if (controller
+                                                                          .getFeedBackPostedList[
+                                                                              index]
+                                                                          .blockStatus!
+                                                                          .hideUser ==
+                                                                      true) {
+                                                                    showSnackBar(
+                                                                        message: controller
+                                                                            .getFeedBackPostedList[index]
+                                                                            .blockStatus!
+                                                                            .hideUserMessage);
+                                                                    return;
+                                                                  }
+                                                                  await Navigator.of(
+                                                                          context)
+                                                                      .push(MaterialPageRoute(
+                                                                          builder: (context) => UserInsidePage(
+                                                                                screenName: 'PostedFeedBacksScreen',
+                                                                                userName: controller.getFeedBackPostedList[index].user!.userIdentity,
+                                                                                avatar: controller.getFeedBackPostedList[index].user!.avatar,
+                                                                                toId: controller.getFeedBackPostedList[index].user!.id,
+                                                                                phone: controller.getFeedBackPostedList[index].user!.phone,
+                                                                                favorite: controller.getFeedBackPostedList[index].defaultStatus == null ? false : controller.getFeedBackPostedList[index].defaultStatus!.receiver!.favorite,
+                                                                                isBlock: controller.getFeedBackPostedList[index].defaultStatus == null ? false : controller.getFeedBackPostedList[index].defaultStatus!.receiver!.block,
+                                                                                flag: controller.getFeedBackPostedList[index].defaultStatus == null ? false : controller.getFeedBackPostedList[index].defaultStatus!.receiver!.flag,
+                                                                                online: controller.getFeedBackPostedList[index].user!.online,
+                                                                                active: controller.getFeedBackPostedList[index].user!.active,
+                                                                              )));
+                                                                },
+                                                                child: userName!
+                                                                            .length >=
+                                                                        22
+                                                                    ? Text(
+                                                                        userName
+                                                                            .toString()
+                                                                            .substring(0,
+                                                                                20),
+                                                                        style:
+                                                                            TextStyle(
+                                                                          fontWeight:
+                                                                              FontWeight.w600,
+                                                                          fontSize:
+                                                                              10.sp,
+                                                                        ),
+                                                                      )
+                                                                    : Text(
+                                                                        userName,
+                                                                        style:
+                                                                            TextStyle(
+                                                                          fontWeight:
+                                                                              FontWeight.w600,
+                                                                          fontSize:
+                                                                              10.sp,
+                                                                        ),
+                                                                      ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                    // SizeConfig.sW1,
+                                                    profileIconSetWidget(
+                                                        profileType:
+                                                            userProfileType),
+                                                  ],
+                                                ),
+                                                SizeConfig.sH1,
+                                                Row(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    SizedBox(
+                                                      child: SvgPicture.asset(
+                                                        earthImg,
+                                                        height: 4.w,
+                                                        width: 4.w,
+                                                        fit: BoxFit.fill,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      "  $country",
+                                                      style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color: ColorUtils
+                                                              .blacklight,
+                                                          fontSize: 10.sp),
+                                                    ),
+                                                    Text(" . $time",
+                                                        style: TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            color: ColorUtils
+                                                                .blacklight,
+                                                            fontSize: 10.sp)),
+                                                  ],
+                                                ),
+                                                SizeConfig.sH1,
+                                                Align(
+                                                  alignment:
+                                                      Alignment.centerLeft,
+                                                  child: ReadMoreText(
+                                                    review!,
+                                                    trimLines: 2,
+                                                    colorClickableText:
+                                                        Colors.pink,
+                                                    trimMode: TrimMode.Line,
+                                                    trimCollapsedText:
+                                                        'Show more',
+                                                    trimExpandedText:
+                                                        'Show less',
+                                                    style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w400,
+                                                        color: ColorUtils.black,
+                                                        height: 1.6,
+                                                        fontSize: 10.sp),
+                                                    lessStyle: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: ColorUtils.grey,
+                                                        height: 1.6,
+                                                        fontSize: 10.sp),
+                                                    moreStyle: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: ColorUtils.grey,
+                                                        height: 1.6,
+                                                        fontSize: 10.sp),
+                                                  ),
+                                                ),
+                                                SizeConfig.sH1,
+                                                data.document == null ||
+                                                        data.document!
+                                                            .isEmpty ||
+                                                        data.document!.first
+                                                                .url ==
+                                                            null
+                                                    ? const SizedBox()
+                                                    : ImageFiltered(
+                                                        imageFilter:
+                                                            ImageFilter.blur(
+                                                          sigmaX: index == 0
+                                                              ? 0
+                                                              : 0,
+                                                          sigmaY: index == 0
+                                                              ? 0
+                                                              : 0,
+                                                          tileMode:
+                                                              TileMode.decal,
+                                                        ),
+                                                        child: VariableUtils
+                                                                .imageFormatList
+                                                                .contains(data
+                                                                    .document!
+                                                                    .first
+                                                                    .ext!
+                                                                    .toUpperCase())
+                                                            ? ClipRRect(
+                                                                borderRadius:
+                                                                    BorderRadius
+                                                                        .circular(
+                                                                            2.w),
+                                                                child:
+                                                                    OctoImage(
+                                                                  image:
+                                                                      CachedNetworkImageProvider(
+                                                                    data
+                                                                        .document!
+                                                                        .first
+                                                                        .url!,
+                                                                  ),
+                                                                  placeholderBuilder:
+                                                                      OctoPlaceholder
+                                                                          .blurHash(
+                                                                    'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
+                                                                  ),
+                                                                  height: 80.w,
+                                                                  width: double
+                                                                      .infinity,
+                                                                  errorBuilder:
+                                                                      OctoError.icon(
+                                                                          color:
+                                                                              Colors.red),
+                                                                  fit: BoxFit
+                                                                      .fitWidth,
+                                                                ),
+                                                              )
+                                                            : VariableUtils
+                                                                    .videoFormatList
+                                                                    .contains(data
+                                                                        .document!
+                                                                        .first
+                                                                        .ext
+                                                                        .toString()
+                                                                        .toUpperCase())
+                                                                ? VideoPlayerService(
+                                                                    key: ValueKey(data
+                                                                        .document!
+                                                                        .first
+                                                                        .url!),
+                                                                    url: data
+                                                                        .document!
+                                                                        .first
+                                                                        .url!,
+                                                                  )
+                                                                : VariableUtils
+                                                                        .documentFormatList
+                                                                        .contains(data
+                                                                            .document!
+                                                                            .first
+                                                                            .ext
+                                                                            .toString()
+                                                                            .toUpperCase())
+                                                                    ? InkWell(
+                                                                        onTap:
+                                                                            () {
+                                                                          firebaseDownloadFile(data.document!.first.url!, DateTime.now().microsecondsSinceEpoch)
+                                                                              .then((value) async {
+                                                                            await Future.delayed(
+                                                                              const Duration(seconds: 2),
+                                                                            );
+                                                                            Get.back();
+                                                                          });
+                                                                        },
+                                                                        child:
+                                                                            Container(
+                                                                          width:
+                                                                              Get.width,
+                                                                          height:
+                                                                              15.w,
+                                                                          alignment:
+                                                                              Alignment.centerRight,
+                                                                          padding:
+                                                                              const EdgeInsets.symmetric(horizontal: 8),
+                                                                          decoration:
+                                                                              BoxDecoration(
+                                                                            borderRadius:
+                                                                                BorderRadius.circular(8),
+                                                                            color:
+                                                                                ColorUtils.grey.withOpacity(0.2),
+                                                                          ),
+                                                                          child:
+                                                                              Row(
+                                                                            mainAxisAlignment:
+                                                                                MainAxisAlignment.spaceBetween,
+                                                                            children: [
+                                                                              Row(
+                                                                                mainAxisSize: MainAxisSize.min,
+                                                                                children: [
+                                                                                  SizedBox(height: 6.w, width: 6.w, child: const Icon(Icons.assignment_outlined)),
+                                                                                  SizedBox(
+                                                                                    width: 1.w,
+                                                                                  ),
+                                                                                  const Text('Click to download file'),
+                                                                                ],
+                                                                              ),
+                                                                              const Icon(Icons.download),
+                                                                            ],
+                                                                          ),
+                                                                        ),
+                                                                      )
+                                                                    : const SizedBox(),
+                                                      ),
+                                                SizeConfig.sH1,
+                                                FeedBackScoreEmoji(
+                                                  score: score!,
+                                                ),
+                                                SizeConfig.sH1,
+                                                Divider(
+                                                  height: 1.h,
+                                                  color: ColorUtils.black,
+                                                ),
+                                                SizeConfig.sH1,
+                                                VariableUtils.feedBackStatusList
+                                                            .contains(
+                                                                data.status) &&
+                                                        data.showText != null
+                                                    ? Padding(
+                                                        padding:
+                                                            EdgeInsets.only(
+                                                                bottom: 1.h),
+                                                        child: Container(
+                                                          color: const Color(
+                                                              0xffE8E8E8),
+                                                          padding: EdgeInsets
+                                                              .symmetric(
+                                                                  horizontal:
+                                                                      3.w),
+                                                          height: 5.h,
+                                                          child: Row(
+                                                            mainAxisAlignment:
+                                                                MainAxisAlignment
+                                                                    .center,
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .center,
+                                                            children: [
+                                                              Image.asset(
+                                                                tickImg,
+                                                                color: ColorUtils
+                                                                    .lightGrey83,
+                                                                height: 5.w,
+                                                                width: 5.w,
+                                                              ),
+                                                              SizedBox(
+                                                                  width: 5.w),
+                                                              Expanded(
+                                                                child: Text(
+                                                                  data.showText!,
+                                                                  style: TextStyle(
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w600,
+                                                                      color: ColorUtils
+                                                                          .lightGrey83,
+                                                                      fontSize:
+                                                                          10.sp),
+                                                                  maxLines: 1,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      )
+                                                    : const SizedBox(),
+                                                SizeConfig.sH1,
+                                                GetBuilder<FeedBackViewModel>(
+                                                  builder:
+                                                      (feedBackController) {
+                                                    return Row(
+                                                      children: [
+                                                        InkResponse(
+                                                          radius: 40,
+                                                          onTap: () async {
+                                                            MyFeedBackResults
+                                                                data =
+                                                                controller
+                                                                        .getFeedBackPostedList[
+                                                                    index];
+
+                                                            String? feedBackId =
+                                                                data.sId!;
+
+                                                            ///DATA FROM LOCAL WHEN IS LIKE IS TRUE
+
+                                                            if (feedBackController
+                                                                    .insideAllLikeMap
+                                                                    .containsKey(
+                                                                        feedBackId) &&
+                                                                feedBackController
+                                                                        .insideAllLikeMap[
+                                                                            feedBackId]!
+                                                                        .interactionStatus ==
+                                                                    true) {
+                                                              if (kDebugMode) {
+                                                                print("LIKE 1");
+                                                              }
+
+                                                              feedBackController
+                                                                  .insideAllLikeMap
+                                                                  .addAll({
+                                                                feedBackId: InteractionStatus(
+                                                                    interactionStatus:
+                                                                        false,
+                                                                    count: feedBackController.insideAllLikeMap[feedBackId]!.count! > 0
+                                                                        ? feedBackController.insideAllLikeMap[feedBackId]!.count! -
+                                                                            1
+                                                                        : feedBackController
+                                                                            .insideAllLikeMap[
+                                                                                feedBackId]!
+                                                                            .count!,
+                                                                    interactionId: feedBackController
+                                                                        .insideAllLikeMap[
+                                                                            feedBackId]!
+                                                                        .interactionId)
+                                                              });
+                                                              await feedBackController.interactionDeleteViewModel(
+                                                                  interactionId: feedBackController
+                                                                      .insideAllLikeMap[
+                                                                          feedBackId]!
+                                                                      .interactionId);
+
+                                                              return;
+                                                            }
+
+                                                            ///DATA FROM LOCAL WHEN IS LIKE IS FALSE
+
+                                                            else if (feedBackController
+                                                                    .insideAllLikeMap
+                                                                    .containsKey(
+                                                                        feedBackId) &&
+                                                                feedBackController
+                                                                        .insideAllLikeMap[
+                                                                            feedBackId]!
+                                                                        .interactionStatus ==
+                                                                    false) {
+                                                              if (kDebugMode) {
+                                                                print("LIKE 2");
+                                                              }
+
+                                                              ///unlike from local data
+                                                              if (feedBackController
+                                                                  .insideAllDisLikeMap
+                                                                  .containsKey(
+                                                                      feedBackId)) {
+                                                                if (kDebugMode) {
+                                                                  print(
+                                                                      "LIKE 3");
+                                                                }
+
+                                                                if (feedBackController
+                                                                        .insideAllDisLikeMap[
+                                                                            feedBackId]!
+                                                                        .interactionStatus ==
+                                                                    true) {
+                                                                  if (kDebugMode) {
+                                                                    print(
+                                                                        "LIKE 4");
+                                                                  }
+
+                                                                  feedBackController
+                                                                      .insideAllDisLikeMap
+                                                                      .addAll({
+                                                                    feedBackId: InteractionStatus(
+                                                                        feedbackId:
+                                                                            feedBackId,
+                                                                        interactionStatus:
+                                                                            false,
+                                                                        count: feedBackController.insideAllDisLikeMap[feedBackId]!.count! > 0
+                                                                            ? feedBackController.insideAllDisLikeMap[feedBackId]!.count! -
+                                                                                1
+                                                                            : feedBackController
+                                                                                .insideAllDisLikeMap[
+                                                                                    feedBackId]!
+                                                                                .count!,
+                                                                        interactionId: feedBackController
+                                                                            .insideAllDisLikeMap[feedBackId]!
+                                                                            .interactionId)
+                                                                  });
+                                                                  await feedBackController.interactionDeleteViewModel(
+                                                                      interactionId: feedBackController
+                                                                          .insideAllDisLikeMap[
+                                                                              feedBackId]!
+                                                                          .interactionId);
+                                                                }
+                                                              }
+                                                              await feedBackController
+                                                                  .feedBackLDCViewModel({
+                                                                "user": PreferenceManagerUtils
+                                                                    .getLoginId(),
+                                                                "feedback":
+                                                                    feedBackId,
+                                                                "ftype": "like"
+                                                              });
+
+                                                              if (feedBackController
+                                                                      .feedBackLikeApiResponse
+                                                                      .status ==
+                                                                  Status
+                                                                      .COMPLETE) {
+                                                                if (kDebugMode) {
+                                                                  print(
+                                                                      "LIKE 5");
+                                                                }
+
+                                                                FeedBackLikeUnLikeResModel
+                                                                    response =
+                                                                    feedBackController
+                                                                        .feedBackLikeApiResponse
+                                                                        .data;
+
+                                                                feedBackController
+                                                                    .insideAllLikeMap
+                                                                    .addAll({
+                                                                  feedBackId: InteractionStatus(
+                                                                      feedbackId:
+                                                                          feedBackId,
+                                                                      interactionStatus:
+                                                                          true,
+                                                                      count:
+                                                                          feedBackController.insideAllLikeMap[feedBackId]!.count! +
+                                                                              1,
+                                                                      interactionId: response
+                                                                          .data!
+                                                                          .sId)
+                                                                });
+                                                              }
+
+                                                              return;
+                                                            }
+
+                                                            ///DATA FROM API WHEN IS LIKE IS TRUE
+
+                                                            else if (data
+                                                                    .mylike ==
+                                                                true) {
+                                                              if (kDebugMode) {
+                                                                print("LIKE 6");
+                                                              }
+
+                                                              feedBackController
+                                                                  .insideAllLikeMap
+                                                                  .addAll({
+                                                                feedBackId: InteractionStatus(
+                                                                    interactionStatus:
+                                                                        false,
+                                                                    count: data
+                                                                                .like! >
+                                                                            0
+                                                                        ? data.like! -
+                                                                            1
+                                                                        : data
+                                                                            .like!)
+                                                              });
+                                                              await feedBackController
+                                                                  .interactionDeleteViewModel(
+                                                                      interactionId:
+                                                                          data.mylikeid);
+
+                                                              return;
+                                                            }
+
+                                                            ///DATA FROM API MY LIKE IS FALSE
+                                                            else if (data
+                                                                    .mylike ==
+                                                                false) {
+                                                              if (kDebugMode) {
+                                                                print("LIKE 7");
+                                                              }
+
+                                                              ///unlike from api data
+                                                              if (data.myunlike ==
+                                                                  true) {
+                                                                if (kDebugMode) {
+                                                                  print(
+                                                                      "LIKE 8");
+                                                                }
+
+                                                                feedBackController
+                                                                    .insideAllDisLikeMap
+                                                                    .addAll({
+                                                                  feedBackId:
+                                                                      InteractionStatus(
+                                                                    feedbackId:
+                                                                        feedBackId,
+                                                                    interactionStatus:
+                                                                        false,
+                                                                    count: data
+                                                                                .unlike! >
+                                                                            0
+                                                                        ? data.unlike! -
+                                                                            1
+                                                                        : data
+                                                                            .unlike!,
+                                                                  )
+                                                                });
+                                                                await feedBackController
+                                                                    .interactionDeleteViewModel(
+                                                                        interactionId:
+                                                                            data.myunlikeid);
+                                                              } else {
+                                                                if (feedBackController
+                                                                    .insideAllDisLikeMap
+                                                                    .containsKey(
+                                                                        feedBackId)) {
+                                                                  feedBackController
+                                                                      .insideAllDisLikeMap
+                                                                      .addAll({
+                                                                    feedBackId: InteractionStatus(
+                                                                        feedbackId:
+                                                                            feedBackId,
+                                                                        interactionStatus:
+                                                                            false,
+                                                                        count: feedBackController.insideAllDisLikeMap[feedBackId]!.count! > 0
+                                                                            ? feedBackController.insideAllDisLikeMap[feedBackId]!.count! -
+                                                                                1
+                                                                            : feedBackController
+                                                                                .insideAllDisLikeMap[
+                                                                                    feedBackId]!
+                                                                                .count!,
+                                                                        interactionId: feedBackController
+                                                                            .insideAllDisLikeMap[feedBackId]!
+                                                                            .interactionId)
+                                                                  });
+                                                                  await feedBackController.interactionDeleteViewModel(
+                                                                      interactionId: feedBackController
+                                                                          .insideAllDisLikeMap[
+                                                                              feedBackId]!
+                                                                          .interactionId);
+                                                                }
+                                                              }
+                                                              await feedBackController
+                                                                  .feedBackLDCViewModel({
+                                                                "user": PreferenceManagerUtils
+                                                                    .getLoginId(),
+                                                                "feedback":
+                                                                    feedBackId,
+                                                                "ftype": "like"
+                                                              });
+
+                                                              if (feedBackController
+                                                                      .feedBackLikeApiResponse
+                                                                      .status ==
+                                                                  Status
+                                                                      .COMPLETE) {
+                                                                if (kDebugMode) {
+                                                                  print(
+                                                                      "LIKE 9");
+                                                                }
+
+                                                                FeedBackLikeUnLikeResModel
+                                                                    response =
+                                                                    feedBackController
+                                                                        .feedBackLikeApiResponse
+                                                                        .data;
+
+                                                                feedBackController
+                                                                    .insideAllLikeMap
+                                                                    .addAll({
+                                                                  feedBackId: InteractionStatus(
+                                                                      feedbackId:
+                                                                          feedBackId,
+                                                                      interactionStatus:
+                                                                          true,
+                                                                      count:
+                                                                          data.like! +
+                                                                              1,
+                                                                      interactionId: response
+                                                                          .data!
+                                                                          .sId)
+                                                                });
+                                                              }
+
+                                                              return;
+                                                            }
+                                                            feedBackController
+                                                                .update();
+                                                          },
+                                                          child:
+                                                              interactionWidget(
+                                                            svg: feedBackController
+                                                                    .insideAllLikeMap
+                                                                    .containsKey(
+                                                                        data
+                                                                            .sId!)
+                                                                ? feedBackController
+                                                                            .insideAllLikeMap[data
+                                                                                .sId]!
+                                                                            .interactionStatus ==
+                                                                        true
+                                                                    ? SvgPicture
+                                                                        .asset(
+                                                                        likeImg,
+                                                                        color: ColorUtils
+                                                                            .primaryColor,
+                                                                      )
+                                                                    : SvgPicture
+                                                                        .asset(
+                                                                        likeImg,
+                                                                      )
+                                                                : data.mylike ==
+                                                                        true
+                                                                    ? SvgPicture
+                                                                        .asset(
+                                                                        likeImg,
+                                                                        color: ColorUtils
+                                                                            .primaryColor,
+                                                                      )
+                                                                    : SvgPicture
+                                                                        .asset(
+                                                                        likeImg,
+                                                                      ),
+                                                            value: feedBackController
+                                                                    .insideAllLikeMap
+                                                                    .containsKey(
+                                                                        data
+                                                                            .sId!)
+                                                                ? feedBackController
+                                                                    .insideAllLikeMap[
+                                                                        data.sId]!
+                                                                    .count
+                                                                : data.like,
+                                                          ),
+                                                        ),
+                                                        SizeConfig.sW5,
+
+                                                        ///dislike
+                                                        InkResponse(
+                                                          radius: 40,
+                                                          onTap: () async {
+                                                            MyFeedBackResults
+                                                                data =
+                                                                controller
+                                                                        .getFeedBackPostedList[
+                                                                    index];
+
+                                                            String? feedBackId =
+                                                                data.sId!;
+
+                                                            ///DATA FROM LOCAL
+
+                                                            if (feedBackController
+                                                                    .insideAllDisLikeMap
+                                                                    .containsKey(
+                                                                        feedBackId) &&
+                                                                feedBackController
+                                                                        .insideAllDisLikeMap[
+                                                                            feedBackId]!
+                                                                        .interactionStatus ==
+                                                                    true) {
+                                                              if (kDebugMode) {
+                                                                print(
+                                                                    "UNLIKE 1");
+                                                              }
+                                                              feedBackController
+                                                                  .insideAllDisLikeMap
+                                                                  .addAll({
+                                                                feedBackId: InteractionStatus(
+                                                                    interactionStatus:
+                                                                        false,
+                                                                    count: feedBackController.insideAllDisLikeMap[feedBackId]!.count! > 0
+                                                                        ? feedBackController.insideAllDisLikeMap[feedBackId]!.count! -
+                                                                            1
+                                                                        : feedBackController
+                                                                            .insideAllDisLikeMap[
+                                                                                feedBackId]!
+                                                                            .count!,
+                                                                    interactionId: feedBackController
+                                                                        .insideAllDisLikeMap[
+                                                                            feedBackId]!
+                                                                        .interactionId)
+                                                              });
+                                                              await feedBackController.interactionDeleteViewModel(
+                                                                  interactionId: feedBackController
+                                                                      .insideAllDisLikeMap[
+                                                                          feedBackId]!
+                                                                      .interactionId);
+
+                                                              return;
+                                                            }
+
+                                                            ///DATA FROM LOCAL
+
+                                                            else if (feedBackController
+                                                                    .insideAllDisLikeMap
+                                                                    .containsKey(
+                                                                        feedBackId) &&
+                                                                feedBackController
+                                                                        .insideAllDisLikeMap[
+                                                                            feedBackId]!
+                                                                        .interactionStatus ==
+                                                                    false) {
+                                                              if (kDebugMode) {
+                                                                print(
+                                                                    "UNLIKE 2");
+                                                              }
+
+                                                              ///unlike from local data
+                                                              if (feedBackController
+                                                                  .insideAllLikeMap
+                                                                  .containsKey(
+                                                                      feedBackId)) {
+                                                                if (kDebugMode) {
+                                                                  print(
+                                                                      "UNLIKE 3");
+                                                                }
+
+                                                                if (feedBackController
+                                                                        .insideAllLikeMap[
+                                                                            feedBackId]!
+                                                                        .interactionStatus ==
+                                                                    true) {
+                                                                  if (kDebugMode) {
+                                                                    print(
+                                                                        "UNLIKE 4");
+                                                                  }
+
+                                                                  feedBackController
+                                                                      .insideAllLikeMap
+                                                                      .addAll({
+                                                                    feedBackId: InteractionStatus(
+                                                                        feedbackId:
+                                                                            feedBackId,
+                                                                        interactionStatus:
+                                                                            false,
+                                                                        count: feedBackController.insideAllLikeMap[feedBackId]!.count! > 0
+                                                                            ? feedBackController.insideAllLikeMap[feedBackId]!.count! -
+                                                                                1
+                                                                            : feedBackController
+                                                                                .insideAllLikeMap[
+                                                                                    feedBackId]!
+                                                                                .count!,
+                                                                        interactionId: feedBackController
+                                                                            .insideAllLikeMap[feedBackId]!
+                                                                            .interactionId)
+                                                                  });
+                                                                  await feedBackController.interactionDeleteViewModel(
+                                                                      interactionId: feedBackController
+                                                                          .insideAllLikeMap[
+                                                                              feedBackId]!
+                                                                          .interactionId);
+                                                                }
+                                                              }
+                                                              await feedBackController
+                                                                  .feedBackLDCViewModel({
+                                                                "user": PreferenceManagerUtils
+                                                                    .getLoginId(),
+                                                                "feedback":
+                                                                    feedBackId,
+                                                                "ftype":
+                                                                    "unlike"
+                                                              });
+
+                                                              if (feedBackController
+                                                                      .feedBackLikeApiResponse
+                                                                      .status ==
+                                                                  Status
+                                                                      .COMPLETE) {
+                                                                if (kDebugMode) {
+                                                                  print(
+                                                                      "UNLIKE 5");
+                                                                }
+
+                                                                FeedBackLikeUnLikeResModel
+                                                                    response =
+                                                                    feedBackController
+                                                                        .feedBackLikeApiResponse
+                                                                        .data;
+
+                                                                feedBackController
+                                                                    .insideAllDisLikeMap
+                                                                    .addAll({
+                                                                  feedBackId: InteractionStatus(
+                                                                      feedbackId:
+                                                                          feedBackId,
+                                                                      interactionStatus:
+                                                                          true,
+                                                                      count:
+                                                                          feedBackController.insideAllDisLikeMap[feedBackId]!.count! +
+                                                                              1,
+                                                                      interactionId: response
+                                                                          .data!
+                                                                          .sId)
+                                                                });
+                                                              }
+
+                                                              return;
+                                                            }
+
+                                                            ///DATA FROM API
+                                                            else if (data
+                                                                    .myunlike ==
+                                                                true) {
+                                                              if (kDebugMode) {
+                                                                print(
+                                                                    "UNLIKE 6");
+                                                              }
+
+                                                              feedBackController
+                                                                  .insideAllDisLikeMap
+                                                                  .addAll({
+                                                                feedBackId: InteractionStatus(
+                                                                    interactionStatus:
+                                                                        false,
+                                                                    count: data
+                                                                                .unlike! >
+                                                                            0
+                                                                        ? data.unlike! -
+                                                                            1
+                                                                        : data
+                                                                            .unlike!)
+                                                              });
+                                                              await feedBackController
+                                                                  .interactionDeleteViewModel(
+                                                                      interactionId:
+                                                                          data.myunlikeid);
+
+                                                              return;
+                                                            }
+
+                                                            ///DATA FROM API
+                                                            else if (data
+                                                                    .myunlike ==
+                                                                false) {
+                                                              if (kDebugMode) {
+                                                                print(
+                                                                    "UNLIKE 7");
+                                                              }
+
+                                                              ///unlike from local data
+                                                              if (data.mylike ==
+                                                                  true) {
+                                                                if (kDebugMode) {
+                                                                  print(
+                                                                      "UNLIKE 8");
+                                                                }
+
+                                                                await feedBackController
+                                                                    .interactionDeleteViewModel(
+                                                                        interactionId:
+                                                                            data.mylikeid);
+
+                                                                feedBackController
+                                                                    .insideAllLikeMap
+                                                                    .addAll({
+                                                                  feedBackId:
+                                                                      InteractionStatus(
+                                                                    feedbackId:
+                                                                        feedBackId,
+                                                                    interactionStatus:
+                                                                        false,
+                                                                    count: data
+                                                                                .like! >
+                                                                            0
+                                                                        ? data.like! -
+                                                                            1
+                                                                        : data
+                                                                            .like!,
+                                                                  )
+                                                                });
+                                                              } else {
+                                                                if (kDebugMode) {
+                                                                  print(
+                                                                      "UNLIKE 9");
+                                                                }
+
+                                                                if (feedBackController
+                                                                    .insideAllLikeMap
+                                                                    .containsKey(
+                                                                        feedBackId)) {
+                                                                  if (kDebugMode) {
+                                                                    print(
+                                                                        "UNLIKE 10");
+                                                                  }
+
+                                                                  feedBackController
+                                                                      .insideAllLikeMap
+                                                                      .addAll({
+                                                                    feedBackId: InteractionStatus(
+                                                                        feedbackId:
+                                                                            feedBackId,
+                                                                        interactionStatus:
+                                                                            false,
+                                                                        count: feedBackController.insideAllLikeMap[feedBackId]!.count! > 0
+                                                                            ? feedBackController.insideAllLikeMap[feedBackId]!.count! -
+                                                                                1
+                                                                            : feedBackController
+                                                                                .insideAllLikeMap[
+                                                                                    feedBackId]!
+                                                                                .count!,
+                                                                        interactionId: feedBackController
+                                                                            .insideAllLikeMap[feedBackId]!
+                                                                            .interactionId)
+                                                                  });
+                                                                  await feedBackController.interactionDeleteViewModel(
+                                                                      interactionId: feedBackController
+                                                                          .insideAllLikeMap[
+                                                                              feedBackId]!
+                                                                          .interactionId);
+                                                                }
+                                                              }
+                                                              await feedBackController
+                                                                  .feedBackLDCViewModel({
+                                                                "user": PreferenceManagerUtils
+                                                                    .getLoginId(),
+                                                                "feedback":
+                                                                    data.sId,
+                                                                "ftype":
+                                                                    "unlike"
+                                                              });
+
+                                                              if (feedBackController
+                                                                      .feedBackLikeApiResponse
+                                                                      .status ==
+                                                                  Status
+                                                                      .COMPLETE) {
+                                                                if (kDebugMode) {
+                                                                  print(
+                                                                      "UNLIKE 11");
+                                                                }
+
+                                                                FeedBackLikeUnLikeResModel
+                                                                    response =
+                                                                    feedBackController
+                                                                        .feedBackLikeApiResponse
+                                                                        .data;
+
+                                                                feedBackController
+                                                                    .insideAllDisLikeMap
+                                                                    .addAll({
+                                                                  feedBackId: InteractionStatus(
+                                                                      feedbackId:
+                                                                          feedBackId,
+                                                                      interactionStatus:
+                                                                          true,
+                                                                      count:
+                                                                          data.unlike! +
+                                                                              1,
+                                                                      interactionId: response
+                                                                          .data!
+                                                                          .sId)
+                                                                });
+                                                              }
+
+                                                              return;
+                                                            }
+                                                            feedBackController
+                                                                .update();
+                                                          },
+                                                          child:
+                                                              interactionWidget(
+                                                            svg: feedBackController
+                                                                    .insideAllDisLikeMap
+                                                                    .containsKey(
+                                                                        data
+                                                                            .sId!)
+                                                                ? feedBackController
+                                                                            .insideAllDisLikeMap[data
+                                                                                .sId]!
+                                                                            .interactionStatus ==
+                                                                        true
+                                                                    ? SvgPicture
+                                                                        .asset(
+                                                                        dislikeImg,
+                                                                        color: ColorUtils
+                                                                            .primaryColor,
+                                                                      )
+                                                                    : SvgPicture
+                                                                        .asset(
+                                                                        dislikeImg,
+                                                                      )
+                                                                : data.myunlike ==
+                                                                        true
+                                                                    ? SvgPicture
+                                                                        .asset(
+                                                                        dislikeImg,
+                                                                        color: ColorUtils
+                                                                            .primaryColor,
+                                                                      )
+                                                                    : SvgPicture
+                                                                        .asset(
+                                                                        dislikeImg,
+                                                                      ),
+                                                            value: feedBackController
+                                                                    .insideAllDisLikeMap
+                                                                    .containsKey(
+                                                                        data
+                                                                            .sId!)
+                                                                ? feedBackController
+                                                                    .insideAllDisLikeMap[
+                                                                        data.sId]!
+                                                                    .count
+                                                                : data.unlike,
+                                                          ),
+                                                        ),
+                                                        SizeConfig.sW5,
+                                                        InkResponse(
+                                                          radius: 40,
+                                                          onTap: () async {
+                                                            await Get.to(
+                                                              FeedBackDetailsScreen(
+                                                                feedBackId: controller
+                                                                    .getFeedBackPostedList[
+                                                                        index]
+                                                                    .sId,
+                                                                isCommentTap:
+                                                                    true,
+                                                              ),
+                                                            );
+                                                            controller
+                                                                .getFeedBackPostedList
+                                                                .clear();
+                                                            controller
+                                                                .feedBackPostedPage = 1;
+                                                            controller
+                                                                    .isFeedBackPostedFirstLoading =
+                                                                true;
+                                                            await controller
+                                                                .getFeedBackPosted();
+                                                            clearLocalList();
+                                                          },
+                                                          child:
+                                                              interactionWidget(
+                                                                  svg: SvgPicture
+                                                                      .asset(
+                                                                    commentImg,
+                                                                  ),
+                                                                  value: data
+                                                                      .comment),
+                                                        ),
+                                                        SizeConfig.sW5,
+                                                        DeepLinkSendWidget(
+                                                          feedBackId: controller
+                                                              .getFeedBackPostedList[
+                                                                  index]
+                                                              .sId,
+                                                          shareLink: controller
+                                                              .getFeedBackPostedList[
+                                                                  index]
+                                                              .shareLink,
+                                                        ),
+                                                      ],
+                                                    );
+                                                  },
+                                                ),
+                                                SizeConfig.sH1,
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                            }),
+                          ),
+                          if (controller.isFeedBackPostedMoreLoading)
+                            const CircularIndicator(
+                              isExpand: false,
+                            ),
+                          SizeConfig.sH1,
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  ///CLEAR LOCAL LIST....
+  void clearLocalList() {
+    feedBackViewModel.insideAllLikeMap.clear();
+    feedBackViewModel.insideAllDisLikeMap.clear();
+  }
+
+  Row interactionWidget({int? value, SvgPicture? svg}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        svg!,
+        const SizedBox(
+          width: 5,
+        ),
+        value == null
+            ? const SizedBox()
+            : Text(
+                value.toString(),
+                style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: ColorUtils.grey,
+                    fontSize: 10.sp),
+              ),
+      ],
+    );
+  }
+}
